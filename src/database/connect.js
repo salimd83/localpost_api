@@ -1,7 +1,7 @@
 const MongoClient = require("mongodb").MongoClient;
 
-const url = "mongodb://localhost:27017";
-const dbName = "location-message";
+const url = process.env.MONGODB_URL;
+const dbName = process.env.MONGODB_DB_NAME;
 const client = new MongoClient(url, { useUnifiedTopology: true });
 
 // Use connect method to connect to the Server

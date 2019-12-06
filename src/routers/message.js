@@ -13,7 +13,16 @@ router.post("/messages", auth, async (req, res) => {
       },
       createdAt: Date.now()
     });
-    res.status(201).send(results.ops[0]);
+    res.status(201).send({
+      ...results.ops[0],
+      user: {
+        firstName: req.user.firstName,
+        lastName: req.user.lastName,
+        email: req.user.lastName,
+        id: req.user._id,
+        createdAt: req.user.createdAt
+      }
+    });
   } catch (e) {
     console.log(e);
     res
@@ -24,24 +33,6 @@ router.post("/messages", auth, async (req, res) => {
 
 router.get("/messages", auth, async (req, res) => {
   try {
-    // const results = await req.app.locals.messagesCollection
-    //   .find({
-    //     location: {
-    //       $near: {
-    //         $geometry: {
-    //           type: "Point",
-    //           coordinates: [
-    //             parseFloat(req.query.long),
-    //             parseFloat(req.query.lat)
-    //           ]
-    //         },
-    //         $minDistance: 0,
-    //         $maxDistance: 10
-    //       }
-    //     }
-    //   })
-    //   .toArray();
-
     const results = await req.app.locals.messagesCollection
       .aggregate([
         {
@@ -54,9 +45,9 @@ router.get("/messages", auth, async (req, res) => {
               ]
             },
             distanceField: "distance",
-            maxDistance: 50,
+            maxDistance: 0.1,
             spherical: true
-          },
+          }
         },
         {
           $lookup: {
@@ -66,9 +57,12 @@ router.get("/messages", auth, async (req, res) => {
             as: "user"
           }
         },
-        {$unwind: '$user'},
+        { $unwind: "$user" },
         {
-          $project: {'user.password': 0, 'user.tokens': 0}
+          $project: { "user.password": 0, "user.tokens": 0 }
+        },
+        {
+          $sort: {createdAt: -1}
         }
       ])
       .toArray();

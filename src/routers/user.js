@@ -10,12 +10,12 @@ const emailConfig = {
   service: "gmail",
   auth: {
     user: "salimdirani@gmail.com",
-    pass: "cy.Dp3GJDOSX"
+    pass: process.env.GMAIL_PASS
   }
 };
 
 // to be set in a config file
-const baseUrl = "http://localhost:3000";
+const baseUrl = process.env.BASE_URL;
 
 router.post("/users", async (req, res) => {
   try {
@@ -29,7 +29,7 @@ router.post("/users", async (req, res) => {
     });
     const user = results.ops[0];
 
-    const token = jwt.sign({ _id: user._id.toString() }, "locationmessageapp");
+    const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET);
 
     await req.app.locals.usersCollection.updateOne(
       { _id: user._id },
@@ -54,7 +54,7 @@ router.post("/users", async (req, res) => {
     console.log(e);
     res
       .status(400)
-      .send(e.code === 11000 ? { message: "Email already in user" } : "");
+      .send(e.code === 11000 ? { message: "Email already in use" } : "");
   }
 });
 
@@ -74,7 +74,7 @@ router.get("/users/sendVerificationEmail", auth, async (req, res) => {
           Dear ${req.user.firstName} ${req.user.lastName} <br /><br />
           Thank you for registering with Location messages app. <br />
           To complete registration you need to click the link below to verify your account:<br />
-          <a href="${baseUrl}/users/verifyEmail?t=${req.token}">${baseUrl}/users/verifyEmail?t=${req.token}</a>
+          <a href="${baseUrl}/users/verifyEmail?t=${req.token}&r=${req.query.redirect}">${baseUrl}/users/verifyEmail?t=${req.token}&r=${req.query.redirect}</a>
           <br />
           <br />
           Sincerly,<br />
@@ -89,14 +89,14 @@ router.get("/users/sendVerificationEmail", auth, async (req, res) => {
       return;
     }
 
-    res.status(200).send({ message: "email sent successfully" });
+    res.status(200).send({ message: "Follow the email sent to your account to verify it." });
   });
 });
 
 router.get("/users/verifyEmail", async (req, res) => {
   try {
     const token = req.query.t;
-    const decoded = jwt.verify(token, "locationmessageapp");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const user = await req.app.locals.usersCollection.findOne({
       _id: ObjectId(decoded._id),
@@ -114,7 +114,8 @@ router.get("/users/verifyEmail", async (req, res) => {
       }
     );
 
-    res.send({ message: "email verified" });
+    // res.send({ message: "email verified" });
+    res.redirect(req.query.r)
   } catch (e) {
     res.status(401).send({ error: "please authenticate!" });
   }
@@ -130,7 +131,7 @@ router.post("/users/login", async (req, res) => {
     const isMatch = await bcrypt.compare(req.body.password, user.password);
     if (!isMatch) throw new Error("Wrong email/password combination");
 
-    const token = jwt.sign({ _id: user._id.toString() }, "locationmessageapp");
+    const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET);
     await req.app.locals.usersCollection.updateOne(
       { _id: user._id },
       {
@@ -167,7 +168,7 @@ router.post("/users/forgotPassword", async (req, res) => {
     return;
   }
 
-  const token = jwt.sign({ _id: user._id.toString() }, "locationmessageapp");
+  const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET2);
 
   var transporter = nodemailer.createTransport(emailConfig);
 
@@ -202,7 +203,7 @@ router.post("/users/resetPassword", async (req, res) => {
   if (!req.body.token) {
     res.status(404).send();
   }
-  const decoded = jwt.verify(req.body.token, "locationmessageapp");
+  const decoded = jwt.verify(req.body.token, process.env.JWT_SECRET2);
   const user = await req.app.locals.usersCollection.findOne({
     _id: ObjectId(decoded._id)
   });
@@ -212,7 +213,7 @@ router.post("/users/resetPassword", async (req, res) => {
   const hashedPass = await hashPass(req.body.password);
 
   try {
-    const token = jwt.sign({ _id: user._id.toString() }, "locationmessageapp");
+    const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET);
     await req.app.locals.usersCollection.updateOne(
       { _id: user._id },
       {
