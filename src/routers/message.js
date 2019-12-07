@@ -45,7 +45,7 @@ router.get("/messages", auth, async (req, res) => {
               ]
             },
             distanceField: "distance",
-            maxDistance: 5,
+            maxDistance: Math.round(parseFloat(req.query.long)),
             spherical: true
           }
         },
