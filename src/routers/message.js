@@ -59,10 +59,21 @@ router.get("/messages", auth, async (req, res) => {
         },
         { $unwind: "$user" },
         {
-          $project: { "user.password": 0, "user.tokens": 0 }
+          $project: { "user.password": 0, "user.tokens": 0, "user.avatar": 0 }
         },
         {
-          $sort: {createdAt: -1}
+          $addFields: {
+            "user.avatar": {
+              $concat: [
+                `${process.env.BASE_URL}/users/`,
+                { $toString: "$user._id" },
+                "/avatar"
+              ]
+            }
+          }
+        },
+        {
+          $sort: { createdAt: -1 }
         }
       ])
       .toArray();

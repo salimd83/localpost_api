@@ -5,6 +5,8 @@ const nodemailer = require("nodemailer");
 const ObjectId = require("mongodb").ObjectID;
 const router = express.Router();
 const auth = require("../middlewares/auth");
+const multer = require("multer");
+const sharp = require("sharp");
 
 const emailConfig = {
   service: "gmail",
@@ -29,7 +31,10 @@ router.post("/users", async (req, res) => {
     });
     const user = results.ops[0];
 
-    const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET);
+    const token = jwt.sign(
+      { _id: user._id.toString() },
+      process.env.JWT_SECRET
+    );
 
     await req.app.locals.usersCollection.updateOne(
       { _id: user._id },
@@ -89,7 +94,9 @@ router.get("/users/sendVerificationEmail", auth, async (req, res) => {
       return;
     }
 
-    res.status(200).send({ message: "Follow the email sent to your account to verify it." });
+    res
+      .status(200)
+      .send({ message: "Follow the email sent to your account to verify it." });
   });
 });
 
@@ -115,7 +122,7 @@ router.get("/users/verifyEmail", async (req, res) => {
     );
 
     // res.send({ message: "email verified" });
-    res.redirect(req.query.r)
+    res.redirect(req.query.r);
   } catch (e) {
     res.status(401).send({ error: "please authenticate!" });
   }
@@ -131,7 +138,10 @@ router.post("/users/login", async (req, res) => {
     const isMatch = await bcrypt.compare(req.body.password, user.password);
     if (!isMatch) throw new Error("Wrong email/password combination");
 
-    const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET);
+    const token = jwt.sign(
+      { _id: user._id.toString() },
+      process.env.JWT_SECRET
+    );
     await req.app.locals.usersCollection.updateOne(
       { _id: user._id },
       {
@@ -213,7 +223,10 @@ router.post("/users/resetPassword", async (req, res) => {
   const hashedPass = await hashPass(req.body.password);
 
   try {
-    const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET);
+    const token = jwt.sign(
+      { _id: user._id.toString() },
+      process.env.JWT_SECRET
+    );
     await req.app.locals.usersCollection.updateOne(
       { _id: user._id },
       {
@@ -280,10 +293,89 @@ router.get("/users/me", auth, async (req, res) => {
   res.send({
     firstName: req.user.firstName,
     lastName: req.user.lastName,
-    email: req.user.lastName,
+    email: req.user.email,
     id: req.user._id,
     createdAt: req.user.createdAt
   });
+});
+
+const upload = multer({
+  limits: {
+    filesize: 2000000,
+    fileFilter(req, file, cb) {
+      if (!file.originalname.match(/\.(jpg|jpeg|gif|png)$/)) {
+        return cb(new Error("Please upload an image"));
+      }
+      cb(undefined, true);
+    }
+  }
+});
+
+router.post(
+  "/user/me/avatar",
+  auth,
+  upload.single("avatar"),
+  async (req, res) => {
+    try {
+      const buffer = await sharp(req.file.buffer)
+        .resize({ width: 250, height: 250 })
+        .png()
+        .toBuffer();
+      await req.app.locals.usersCollection.updateOne(
+        { _id: req.user._id },
+        {
+          $set: {
+            avatar: buffer
+          }
+        }
+      );
+      res.send();
+    } catch (e) {
+      req.status(500).send();
+    }
+  },
+  (error, req, res, next) => {
+    res.status(400).send({ error: error.message });
+  }
+);
+
+router.delete("/user/me/avatar", auth, async (req, res) => {
+  try {
+    await req.app.locals.usersCollection.updateOne(
+      { _id: req.user._id },
+      {
+        $set: {
+          avatar: undefined
+        }
+      }
+    );
+    res.send();
+  } catch (e) {
+    res.status(500).send();
+  }
+});
+
+router.get("/users/:id/avatar", async (req, res) => {
+  try {
+    const user = await req.app.locals.usersCollection.findOne({
+      _id: ObjectId(req.params.id)
+    });
+
+    if (!user) {
+      throw new Error();
+    }
+
+    if (!user.avatar) {
+      res.redirect(
+        `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}`
+      );
+    }
+
+    res.set("Content-Type", "image/png");
+    res.send(user.avatar.buffer);
+  } catch (e) {
+    res.status(404).send();
+  }
 });
 
 async function hashPass(pass) {
