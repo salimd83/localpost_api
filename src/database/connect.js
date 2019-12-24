@@ -13,39 +13,39 @@ async function connect(callback) {
     const messages = db.collection("messages");
     messages.createIndex({ location: "2dsphere" });
 
-    db.createCollection("users", {
+    if (db.listCollections({ name: "users" }).hasNext())
+      db.createCollection("users", {
         validator: {
-            $jsonSchema: {
-                bsonType: "object",
-                required: [ "firstName", "lastName", "email", "password" ],
-                properties: {
-                    firstName: {
-                        bsonType: "string",
-                        description: "must be a string and is required"
-                    },
-                    lastName: {
-                        bsonType: "string",
-                        description: "must be a string and is required"
-                    },
-                    email: {
-                        bsonType: "string",
-                        pattern: '^.+\@.+$',
-                        description: "required and must be a valid email address"
-                    },
-                    password: {
-                        bsonType: "string",
-                        minLength: 6,
-                        description: "required and must be at least 6 chracters"
-                    }
-                }
+          $jsonSchema: {
+            bsonType: "object",
+            required: ["firstName", "lastName", "email", "password"],
+            properties: {
+              firstName: {
+                bsonType: "string",
+                description: "must be a string and is required"
+              },
+              lastName: {
+                bsonType: "string",
+                description: "must be a string and is required"
+              },
+              email: {
+                bsonType: "string",
+                pattern: "^.+@.+$",
+                description: "required and must be a valid email address"
+              },
+              password: {
+                bsonType: "string",
+                minLength: 6,
+                description: "required and must be at least 6 chracters"
+              }
             }
+          }
         }
-    });
-    const users = db.collection("users")
-    users.createIndex( { "email": 1 }, { unique: true } )
+      });
+    const users = db.collection("users");
+    users.createIndex({ email: 1 }, { unique: true });
 
-
-    callback({messages, users})
+    callback({ messages, users });
   } catch (e) {
     console.log("could not connect to database", e);
   }
